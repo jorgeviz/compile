@@ -1,6 +1,6 @@
 import argparse
 import torch
-
+import os
 import utils
 import modules
 
@@ -27,6 +27,10 @@ parser.add_argument('--no-cuda', action='store_true', default=False,
                     help='Disable CUDA training.')
 parser.add_argument('--log-interval', type=int, default=5,
                     help='Logging interval.')
+parser.add_argument('--log-dir', type=str, default="output",
+                    dest="log_dir",
+                    help='Logging directory.')
+
 
 args = parser.parse_args()
 args.cuda = not args.no_cuda and torch.cuda.is_available()
@@ -41,6 +45,20 @@ model = modules.CompILE(
     latent_dist=args.latent_dist).to(device)
 
 optimizer = torch.optim.Adam(model.parameters(), lr=args.learning_rate)
+
+# Create directory for plots
+if not os.path.exists(args.log_dir):
+    os.mkdir(args.log_dir)
+# Create file for plot
+plt_fname = os.path.join(args.log_dir,  '_'.join([str(x) for x in [
+    args.num_symbols,"symbols",
+    args.num_segments,"segments",
+    args.latent_dim, "latent",
+    args.latent_dist,
+    args.iterations, "iters.txt"]])
+)
+with open(plt_fname, 'w') as plotf:
+    plotf.write("step,nll,rec_acc,batch_nll,batch_rec_acc\n")
 
 # Train model.
 print('Training model...')
@@ -84,4 +102,10 @@ for step in range(args.iterations):
             step, batch_loss, batch_acc))
         print('input sample: {}'.format(inputs[-1, :lengths[-1] - 1]))
         print('reconstruction: {}'.format(rec[-1]))
+        # Append results to file
+        with open(plt_fname, 'a') as pltf:
+            pltf.write(','.join([str(x) for x in [
+                step, nll.item(), acc.item(), 
+                batch_loss, batch_acc
+            ]]) + "\n")
 
